@@ -1,0 +1,1 @@
+void gst_stream_video0_localhost();
