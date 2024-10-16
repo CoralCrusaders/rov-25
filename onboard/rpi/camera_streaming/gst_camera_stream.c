@@ -1,4 +1,5 @@
 #include <gst/gst.h>
+#include "gst_camera_stream.h"
 
 void gst_stream_video0_localhost() {
     GstElement *pipeline;
