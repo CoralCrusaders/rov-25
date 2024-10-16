@@ -1,7 +1,7 @@
 #include <gst/gst.h>
 #include "gst_camera_stream.h"
 
-void gst_stream_video0_localhost() {
+void gst_stream_video0_localhost(int argc, char* argv[]) {
     GstElement *pipeline;
     GstBus *bus;
     GstMessage *msg;
@@ -54,7 +54,7 @@ void gst_stream_video0_localhost() {
     gst_object_unref(pipeline);
 }
 
-void gst_stream_video_remote(char* video, char* ip, int port) {
+void gst_stream_video_remote(int argc, char* argv[], char* video, char* ip, int port) {
     GstElement *pipeline;
     GstBus *bus;
     GstMessage *msg;
