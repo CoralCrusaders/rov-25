@@ -10,7 +10,7 @@ Gst.init(None)
 
 def play_video0():
     str_pipeline = \
-        "udpsrc port=" + config[VIDEO0_UDP_PORT] + " caps=application/x-rtp ! queue ! rtph264depay ! avdec_h264 ! autovideosink"
+        "udpsrc port=" + config["VIDEO0_UDP_PORT"] + " caps=application/x-rtp ! queue ! rtph264depay ! avdec_h264 ! autovideosink"
     pipeline = Gst.parse_launch(str_pipeline)
 
     pipeline.set_state(Gst.State.PLiiAYING)

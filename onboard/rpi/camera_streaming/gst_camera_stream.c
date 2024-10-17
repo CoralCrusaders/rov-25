@@ -53,7 +53,7 @@ void gst_stream_video0_localhost(int argc, char* argv[]) {
     gst_element_set_state(pipeline, GST_STATE_NULL);
     gst_object_unref(pipeline);
 }
-
+/*
 void gst_stream_video_remote(int argc, char* argv[], char* video, char* ip, int port) {
     GstElement *pipeline;
     GstBus *bus;
@@ -62,7 +62,8 @@ void gst_stream_video_remote(int argc, char* argv[], char* video, char* ip, int 
     
     gst_init(&argc, &argv);
 
-    str_gst_parse[255];
+    
+    char str_gst_parse[255];
     sprintf(str_gst_parse, "v4l2src device=%s ! video/x-h264 ! h264parse ! rtph264pay ! udpsink host=%s port=%d", video, ip, port);
 
     pipeline = 
@@ -109,3 +110,4 @@ void gst_stream_video_remote(int argc, char* argv[], char* video, char* ip, int 
     gst_element_set_state(pipeline, GST_STATE_NULL);
     gst_object_unref(pipeline);
 }
+*/
