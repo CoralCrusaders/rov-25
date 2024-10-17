@@ -1,7 +1,7 @@
 #include <gst/gst.h>
 #include "gst_camera_stream.h"
 
-void gst_stream_video0_localhost(int argc, char* argv[]) {
+int gst_stream_video0_localhost(int argc, char* argv[]) {
     GstElement *pipeline;
     GstBus *bus;
     GstMessage *msg;
@@ -10,7 +10,7 @@ void gst_stream_video0_localhost(int argc, char* argv[]) {
     gst_init(&argc, &argv);
 
     pipeline = 
-        gst_parse_lanch("v4l2src device=/dev/video0 ! video/x-h264 ! h264parse ! rtph264pay ! udpsink host=127.0.0.1 port=6000", &error);
+        gst_parse_launch("v4l2src device=/dev/video0 ! video/x-h264 ! h264parse ! rtph264pay ! udpsink host=127.0.0.1 port=6000", &error);
     
     if (!pipeline) {
         g_printerr("Failed to create pipeline: %s\n", error->message);
@@ -54,7 +54,7 @@ void gst_stream_video0_localhost(int argc, char* argv[]) {
     gst_object_unref(pipeline);
 }
 /*
-void gst_stream_video_remote(int argc, char* argv[], char* video, char* ip, int port) {
+int gst_stream_video_remote(int argc, char* argv[], char* video, char* ip, int port) {
     GstElement *pipeline;
     GstBus *bus;
     GstMessage *msg;
