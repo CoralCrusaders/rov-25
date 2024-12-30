@@ -25,5 +25,8 @@ DESTDIR=bin
 clean:
 	rm -rf $(DESTDIR)
 
+main: main.c
+	$(CC) $(CFLAGS) -o $(DESTDIR)/$@ $^ $(CPPFLAGS)
+
 gst_video0_remote: modes/gst_video0_remote.c camera_streaming/gst_camera_stream.c
 	$(CC) $(CFLAGS) -o $(DESTDIR)/$@ $^ $(CPPFLAGS)
