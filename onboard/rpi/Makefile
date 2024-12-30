@@ -11,7 +11,7 @@ NMEA_TCP_PORT=10110
 
 CC=gcc
 
-CFLAGS= -g -Wall -Werror
+CFLAGS= -g -Wextra
 GST_CFLAGS=`pkg-config --cflags --libs gstreamer-1.0`
 CPPFLAGS=-DTOPSIDE_LAN_IP=\"$(TOPSIDE_LAN_IP)\" -DONBOARD_LAN_IP=\"$(ONBOARD_LAN_IP)\" -DVIDEO0_UDP_PORT=$(VIDEO0_UDP_PORT) -DVIDEO1_UDP_PORT=$(VIDEO1_UDP_PORT) -DVIDEO2_UDP_PORT=$(VIDEO2_UDP_PORT) -DVIDEO3_UDP_PORT=$(VIDEO3_UDP_PORT) -DVIDEO4_UDP_PORT=$(VIDEO4_UDP_PORT) -DNMEA_TCP_PORT=$(NMEA_TCP_PORT)
 
@@ -25,8 +25,5 @@ DESTDIR=bin
 clean:
 	rm -rf $(DESTDIR)
 
-main: main.c
-	$(CC) $(CFLAGS) -o $(DESTDIR)/$@ $^ $(CPPFLAGS)
-
-gst_video0_remote: modes/gst_video0_remote.c camera_streaming/gst_camera_stream.c
-	$(CC) $(CFLAGS) -o $(DESTDIR)/$@ $^ $(CPPFLAGS)
+gst_video0_localhost: modes/gst_video0_localhost.c camera_streaming/gst_camera_stream.c
+	$(CC) $^ -o $(DESTDIR)/$@ $(CFLAGS) $(CPPFLAGS)
