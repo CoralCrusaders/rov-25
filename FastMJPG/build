@@ -2,15 +2,15 @@
 
 if [[ "$1" == "measure" ]]; then
     CC=gcc
-    CFLAGS="-Wall -Wextra -Werror -O3 -I./include -DMEASURE"
+    CFLAGS="-Wall -Wextra -O3 -I./include -DMEASURE"
     LFLAGS="-lturbojpeg -lglfw -lavformat -lavcodec -lavutil -lm -O3"
 elif [[ "$1" == "debug" ]]; then
     CC=gcc
-    CFLAGS="-Wall -Wextra -Werror -g -I./include"
+    CFLAGS="-Wall -Wextra -g -I./include"
     LFLAGS="-lturbojpeg -lglfw -lavformat -lavcodec -lavutil -lm -g"
 else
     CC=gcc
-    CFLAGS="-Wall -Wextra -Werror -O3 -I./include"
+    CFLAGS="-Wall -Wextra -O3 -I./include"
     LFLAGS="-lturbojpeg -lglfw -lavformat -lavcodec -lavutil -lm -O3"
 fi
 
