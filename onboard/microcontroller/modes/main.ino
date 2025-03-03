@@ -414,11 +414,6 @@ inline void read_imu_data() {
 
 inline void calc_vert_power() {
   int32_t unscaled_vert_power;
-  if(input_data.ABS_HAT0Y != 0) {
-    depth_set_avl = true;
-    unscaled_vert_power = NORMALIZE_DPAD(input_data.ABS_HAT0Y) * DPAD_VERT_GAIN * THRUSTER_VERT_DIR;
-    return;
-  }
   if(!depth_hold || abs(input_data.ABS_RY) > 150) {
     depth_set_avl = true;
     unscaled_vert_power = NORMALIZE_JOYSTICK(input_data.ABS_RY) * mult * THRUSTER_VERT_DIR;
