@@ -1,1 +1,1 @@
-./FastMJPG/bin/FastMJPG capture /dev/video0 640 480 1 30 send 192.168.68.22 5600 192.168.68.12 5600 1400 1000000 1
+./FastMJPG/bin/FastMJPG capture /dev/video0 640 480 1 30 send 192.168.7.165 5600 192.168.7.165 5600 1400 1000000 1
