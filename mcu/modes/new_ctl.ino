@@ -15,7 +15,7 @@
 
 #define AMP_LIMIT (20) // fuse melts at 25 amps, leave 5 amp clearance
 #define HOR_AMP_LIMIT (10)
-#define VERT_AMP_LIMIT (AMP_LIMIT - HOR _AMP_LIMIT)
+#define VERT_AMP_LIMIT (AMP_LIMIT - HOR_AMP_LIMIT)
 // (AMPS) taken from blue robotics t200 specs @ 12V
 // https://cad.bluerobotics.com/T200-Public-Performance-Data-10-20V-September-2019.xlsx
 #define AMP_LIST {17.03, 17.08, 16.76, 16.52, 16.08, 15.69, 15.31, 15.00, 14.51, 14.17, 13.82, 13.46, 13.08, 12.80, 12.40, 12.00, 11.66, 11.31, 11.10, 10.74, 10.50, 10.11, 9.84, 9.50, 9.20, 8.90, 8.60, 8.30, 8.00, 7.70, 7.40, 7.10, 6.90, 6.60, 6.40, 6.20, 5.99, 5.77, 5.50, 5.32, 5.17, 4.90, 4.70, 4.56, 4.30, 4.10, 3.90, 3.73, 3.60, 3.40, 3.30, 3.10, 2.98, 2.80, 2.70, 2.41, 2.30, 2.10, 2.00, 1.90, 1.80, 1.70, 1.60, 1.50, 1.31, 1.30, 1.20, 1.10, 1.00, 0.90, 0.80, 0.80, 0.70, 0.60, 0.50, 0.50, 0.41, 0.40, 0.40, 0.30, 0.29, 0.20, 0.20, 0.20, 0.10, 0.10, 0.10, 0.05, 0.05, 0.05, 0.05, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.05, 0.05, 0.05, 0.10, 0.10, 0.10, 0.10, 0.20, 0.20, 0.20, 0.30, 0.30, 0.40, 0.40, 0.50, 0.50, 0.60, 0.70, 0.70, 0.80, 0.80, 1.00, 1.00, 1.10, 1.20, 1.30, 1.40, 1.50, 1.60, 1.70, 1.80, 2.00, 2.10, 2.20, 2.30, 2.50, 2.80, 2.90, 3.00, 3.20, 3.30, 3.50, 3.67, 3.80, 4.00, 4.20, 4.40, 4.60, 4.80, 5.00, 5.20, 5.40, 5.69, 5.80, 6.00, 6.30, 6.50, 6.70, 7.00, 7.20, 7.50, 7.80, 8.00, 8.32, 8.64, 8.90, 9.24, 9.50, 9.82, 10.14, 10.45, 10.72, 11.10, 11.32, 11.62, 12.01, 12.37, 12.61, 13.04, 13.44, 13.70, 14.11, 14.40, 14.76, 15.13, 15.52, 15.87, 16.30, 16.74, 16.86, 16.91};
@@ -35,7 +35,9 @@
 #define FOR_GAIN ((double)0.5)
 #define LAT_GAIN ((double)0.4)
 #define ROT_GAIN ((double)0.2)
-#define SLOW_GAIN ((double)0.5)
+
+#define DEFAULT_MULT ((double)1.0)
+#define SLOW_MULT ((double)0.5)
 
 #define S1 A8
 #define S2 A0
@@ -185,6 +187,7 @@ double pwr_to_current[201] = AMP_LIST;
 double mult;
 
 char sig[6];
+char checksum_char[3];
 
 bool slowmode = false;
 bool slowmode_btn_avl = true;
@@ -303,7 +306,7 @@ inline bool nmea_checksum() {
 }
 
 inline void drain_serial_input() {
-  while(Serial.peek() != '$') {
+  while(Serial.available() > 0 && Serial.peek() != '$') {
     Serial.read();
   }
 }
@@ -319,7 +322,7 @@ inline void read_serial_input() {
     if(Serial.peek() != '$') {
       Serial.print("ERRSTX ");
       Serial.println(Serial.read(), HEX);
-      //drain_serial_input();
+      drain_serial_input();
       return;
     }
     Serial.read();
@@ -327,21 +330,21 @@ inline void read_serial_input() {
     if(strcmp(sig, "RPCTL") != 0) {
       Serial.print("ERRSIG ");
       Serial.println(sig);
-      //drain_serial_input();
+      drain_serial_input();
       return;
     }
     Serial.readBytes((char*)&input_data, sizeof(input_data));
     if(Serial.peek() != '*') {
       Serial.print("ERRTRM ");
       Serial.println(Serial.read());
-      //drain_serial_input();
+      drain_serial_input();
       return;
     }
     Serial.read();
     Serial.readBytes(checksum_char, 2);
     if(!nmea_checksum()) {
       Serial.print("ERRCHK\n");
-      //drain_serial_input();
+      drain_serial_input();
       return;
     }
   }
@@ -385,7 +388,7 @@ inline void read_imu() {
   // }
 }
 
-inline read_bar02() {
+inline void read_bar02() {
   bar02_sensor.read();
   sensor_data.depth_m_s = bar02_sensor.depth() - sensor_data.depth_m;
   sensor_data.depth_m += sensor_data.depth_m_s;
@@ -407,14 +410,14 @@ inline void calc_vert_power() {
   double desired_depth_rate = 0;
 
   if(abs(input_data.ABS_RY) != 0) {
-    depth_rate = input_data.ABS_RY / JOYSTICK_MAGNITUDE * 1.0f;
+    desired_depth_rate = input_data.ABS_RY / JOYSTICK_MAGNITUDE * 1.0f;
     depth_set_avl = true;
   } else {
     if(depth_set_avl) {
       depth_set_avl = false;
       depth_rate_controller.set_target(sensor_data.depth_m);
     }
-    depth_rate = depth_rate_controller.compute(sensor_data.depth_m);
+    desired_depth_rate = depth_rate_controller.compute(sensor_data.depth_m);
   }
   depth_pwr_controller.set_target(desired_depth_rate);
   depth_pwr = depth_pwr_controller.compute(sensor_data.depth_m_s);
@@ -424,17 +427,17 @@ inline void calc_vert_power() {
   vbr_pwr += depth_pwr;
 
   double normalize;
-  double max_pwr = max(max(max(max(max(fabs(vfl_pwr), fabs(vfr_pwr)), fabs(vbl_pwr)), fabs(vbr_pwr))));
+  double max_pwr = max(max(max(fabs(vfl_pwr), fabs(vfr_pwr)), fabs(vbl_pwr)), fabs(vbr_pwr));
   if(max_pwr > 1.0f) {
     normalize = 1.0f / max_pwr;
   } else {
     normalize = 1.0f;
   }
 
-  thruster_power.vfl = (int32_t)(vfl_pwr * ESC_MAGNITUDE * normalize);
-  thruster_power.vfr = (int32_t)(vfr_pwr * ESC_MAGNITUDE * normalize);
-  thruster_power.vbl = (int32_t)(vbl_pwr * ESC_MAGNITUDE * normalize);
-  thruster_power.vbr = (int32_t)(vbr_pwr * ESC_MAGNITUDE * normalize);
+  thruster_power.vfl_pwr = (int32_t)(vfl_pwr * ESC_MAGNITUDE * normalize);
+  thruster_power.vfr_pwr = (int32_t)(vfr_pwr * ESC_MAGNITUDE * normalize);
+  thruster_power.vbl_pwr = (int32_t)(vbl_pwr * ESC_MAGNITUDE * normalize);
+  thruster_power.vbr_pwr = (int32_t)(vbr_pwr * ESC_MAGNITUDE * normalize);
 }
 
 inline void calc_hor_power() {
@@ -444,17 +447,17 @@ inline void calc_hor_power() {
   double hbr_pwr = 0;
 
   if(abs(input_data.ABS_LY) != 0) {
-    hfl_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LY) * FOR_GAIN * THRUSTER_FL_DIR * mult;
-    hfr_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LY) * FOR_GAIN * THRUSTER_FR_DIR * mult;
-    hbl_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LY) * FOR_GAIN * THRUSTER_BL_DIR * mult;
-    hbr_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LY) * FOR_GAIN * THRUSTER_BR_DIR * mult;
+    hfl_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LY) * FOR_GAIN * HFL_DIR * mult;
+    hfr_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LY) * FOR_GAIN * HFR_DIR * mult;
+    hbl_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LY) * FOR_GAIN * HBL_DIR * mult;
+    hbr_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LY) * FOR_GAIN * HBR_DIR * mult;
   }
 
   if(abs(input_data.ABS_LX) != 0) {
-    hfl_pwr -= NORMALIZE_JOYSTICK(input_data.ABS_LX) * LAT_GAIN * THRUSTER_FL_DIR * mult;
-    hfr_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LX) * LAT_GAIN * THRUSTER_FR_DIR * mult;
-    hbl_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LX) * LAT_GAIN * THRUSTER_BL_DIR * mult;
-    hbr_pwr -= NORMALIZE_JOYSTICK(input_data.ABS_LX) * LAT_GAIN * THRUSTER_BR_DIR * mult;
+    hfl_pwr -= NORMALIZE_JOYSTICK(input_data.ABS_LX) * LAT_GAIN * HFL_DIR * mult;
+    hfr_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LX) * LAT_GAIN * HFR_DIR * mult;
+    hbl_pwr += NORMALIZE_JOYSTICK(input_data.ABS_LX) * LAT_GAIN * HBL_DIR * mult;
+    hbr_pwr -= NORMALIZE_JOYSTICK(input_data.ABS_LX) * LAT_GAIN * HBR_DIR * mult;
   }
 
   double yaw_pwr = 0;
@@ -479,24 +482,24 @@ inline void calc_hor_power() {
   hbr_pwr += yaw_pwr;
 
   double normalize;
-  double max_pwr = max(max(max(max(max(fabs(hfl_pwr), fabs(hfr_pwr)), fabs(hbl_pwr)), fabs(hbr_pwr))));
+  double max_pwr = max(max(max(fabs(hfl_pwr), fabs(hfr_pwr)), fabs(hbl_pwr)), fabs(hbr_pwr));
   if(max_pwr > 1.0f) {
     normalize = 1.0f / max_pwr;
   } else {
     normalize = 1.0f;
   }
-  thruster_power.hfl = (int32_t)(hfl_pwr * ESC_MAGNITUDE * normalize);
-  thruster_power.hfr = (int32_t)(hfr_pwr * ESC_MAGNITUDE * normalize);
-  thruster_power.hbl = (int32_t)(hbl_pwr * ESC_MAGNITUDE * normalize);
-  thruster_power.hbr = (int32_t)(hbr_pwr * ESC_MAGNITUDE * normalize);
+  thruster_power.hfl_pwr = (int32_t)(hfl_pwr * ESC_MAGNITUDE * normalize);
+  thruster_power.hfr_pwr = (int32_t)(hfr_pwr * ESC_MAGNITUDE * normalize);
+  thruster_power.hbl_pwr = (int32_t)(hbl_pwr * ESC_MAGNITUDE * normalize);
+  thruster_power.hbr_pwr = (int32_t)(hbr_pwr * ESC_MAGNITUDE * normalize);
 }
 
 inline double vert_amps() {
-  return PWR_TO_AMPS(thruster_power.vfl) + PWR_TO_AMPS(thruster_power.vfr) + PWR_TO_AMPS(thruster_power.vbl) + PWR_TO_AMPS(thruster_power.vbr);
+  return PWR_TO_AMPS(thruster_power.vfl_pwr) + PWR_TO_AMPS(thruster_power.vfr_pwr) + PWR_TO_AMPS(thruster_power.vbl_pwr) + PWR_TO_AMPS(thruster_power.vbr_pwr);
 }
 
 inline double hor_amps() {
-  return PWR_TO_AMPS(thruster_power.hfl) + PWR_TO_AMPS(thruster_power.hfr) + PWR_TO_AMPS(thruster_power.hbl) + PWR_TO_AMPS(thruster_power.hbr);
+  return PWR_TO_AMPS(thruster_power.hfl_pwr) + PWR_TO_AMPS(thruster_power.hfr_pwr) + PWR_TO_AMPS(thruster_power.hbl_pwr) + PWR_TO_AMPS(thruster_power.hbr_pwr);
 }
 
 inline void limit_current() {
@@ -507,38 +510,38 @@ inline void limit_current() {
   if(vert_amps() > VERT_AMP_LIMIT && hor_amps() > HOR_AMP_LIMIT) {
     double vert_ratio = VERT_AMP_LIMIT / vert_amps();
     double hor_ratio = HOR_AMP_LIMIT / hor_amps();
-    control_data.vfl_pwr *= vert_ratio;
-    control_data.vfr_pwr *= vert_ratio;
-    control_data.vbl_pwr *= vert_ratio;
-    control_data.vbr_pwr *= vert_ratio;
-    control_data.hfl_pwr *= hor_ratio;
-    control_data.hfr_pwr *= hor_ratio;
-    control_data.hbl_pwr *= hor_ratio;
-    control_data.hbr_pwr *= hor_ratio;
+    thruster_power.vfl_pwr *= vert_ratio;
+    thruster_power.vfr_pwr *= vert_ratio;
+    thruster_power.vbl_pwr *= vert_ratio;
+    thruster_power.vbr_pwr *= vert_ratio;
+    thruster_power.hfl_pwr *= hor_ratio;
+    thruster_power.hfr_pwr *= hor_ratio;
+    thruster_power.hbl_pwr *= hor_ratio;
+    thruster_power.hbr_pwr *= hor_ratio;
   } else if(vert_amps() > VERT_AMP_LIMIT) {
     double vert_ratio = (AMP_LIMIT - hor_amps()) / vert_amps();
-    control_data.vfl_pwr *= vert_ratio;
-    control_data.vfr_pwr *= vert_ratio;
-    control_data.vbl_pwr *= vert_ratio;
-    control_data.vbr_pwr *= vert_ratio;
+    thruster_power.vfl_pwr *= vert_ratio;
+    thruster_power.vfr_pwr *= vert_ratio;
+    thruster_power.vbl_pwr *= vert_ratio;
+    thruster_power.vbr_pwr *= vert_ratio;
   } else if(hor_amps() > HOR_AMP_LIMIT) {
     double hor_ratio = (AMP_LIMIT - vert_amps()) / hor_amps();
-    control_data.hfl_pwr *= hor_ratio;
-    control_data.hfr_pwr *= hor_ratio;
-    control_data.hbl_pwr *= hor_ratio;
-    control_data.hbr_pwr *= hor_ratio;
+    thruster_power.hfl_pwr *= hor_ratio;
+    thruster_power.hfr_pwr *= hor_ratio;
+    thruster_power.hbl_pwr *= hor_ratio;
+    thruster_power.hbr_pwr *= hor_ratio;
   }
 }
 
 inline void power_thrusters() {
-  thrusters.vfl.writeMicroseconds(THRUSTER_POWER(thruster_power.vfl));
-  thrusters.vfr.writeMicroseconds(THRUSTER_POWER(thruster_power.vfr));
-  thrusters.vbl.writeMicroseconds(THRUSTER_POWER(thruster_power.vbl));
-  thrusters.vbr.writeMicroseconds(THRUSTER_POWER(thruster_power.vbr));
-  thrusters.hfl.writeMicroseconds(THRUSTER_POWER(thruster_power.hfl));
-  thrusters.hfr.writeMicroseconds(THRUSTER_POWER(thruster_power.hfr));
-  thrusters.hbl.writeMicroseconds(THRUSTER_POWER(thruster_power.hbl));
-  thrusters.hbr.writeMicroseconds(THRUSTER_POWER(thruster_power.hbr));
+  thrusters.vfl.writeMicroseconds(THRUSTER_POWER(thruster_power.vfl_pwr));
+  thrusters.vfr.writeMicroseconds(THRUSTER_POWER(thruster_power.vfr_pwr));
+  thrusters.vbl.writeMicroseconds(THRUSTER_POWER(thruster_power.vbl_pwr));
+  thrusters.vbr.writeMicroseconds(THRUSTER_POWER(thruster_power.vbr_pwr));
+  thrusters.hfl.writeMicroseconds(THRUSTER_POWER(thruster_power.hfl_pwr));
+  thrusters.hfr.writeMicroseconds(THRUSTER_POWER(thruster_power.hfr_pwr));
+  thrusters.hbl.writeMicroseconds(THRUSTER_POWER(thruster_power.hbl_pwr));
+  thrusters.hbr.writeMicroseconds(THRUSTER_POWER(thruster_power.hbr_pwr));
 }
 
 inline void elim_deadzones() {
@@ -565,21 +568,21 @@ inline void elim_deadzones() {
 inline void transmit_rov_data() {
   Serial.print("$TNCTL");
   Serial.print(",");
-  Serial.print(control_data.vfl_pwr);
+  Serial.print(thruster_power.vfl_pwr);
   Serial.print(",");
-  Serial.print(control_data.vfr_pwr);
+  Serial.print(thruster_power.vfr_pwr);
   Serial.print(",");
-  Serial.print(control_data.vbl_pwr);
+  Serial.print(thruster_power.vbl_pwr);
   Serial.print(",");
-  Serial.print(control_data.vbr_pwr);
+  Serial.print(thruster_power.vbr_pwr);
   Serial.print(",");
-  Serial.print(control_data.hfl_pwr);
+  Serial.print(thruster_power.hfl_pwr);
   Serial.print(",");
-  Serial.print(control_data.hfr_pwr);
+  Serial.print(thruster_power.hfr_pwr);
   Serial.print(",");
-  Serial.print(control_data.hbl_pwr);
+  Serial.print(thruster_power.hbl_pwr);
   Serial.print(",");
-  Serial.print(control_data.hbr_pwr);
+  Serial.print(thruster_power.hbr_pwr);
   Serial.print(",");
   Serial.print(sensor_data.depth_m);
   Serial.print(",");
@@ -622,5 +625,3 @@ void loop() {
 
   prog_iter = (prog_iter + 1) % SERIAL_TRANSMISSION_WRAP;
 }
-
-
