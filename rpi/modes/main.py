@@ -15,7 +15,7 @@ TEENSY_4_1_PIPE = '/dev/ACM0'
 
 GAMEPAD_NUM_INPUTS: int = 18
 
-data: str = ""
+onboard_data: str = ""
 nmea_bytes = b''
 
 gamepad_inputs: list[int] = [0] * GAMEPAD_NUM_INPUTS
@@ -63,8 +63,8 @@ def monitor_socket_input():
         datalen: int = int(s.recv(4).decode('ASCII'))
     except:
         return         
-    data: str = s.recv(datalen).decode('ASCII')
-    chunks: list[str] = data.split(",");
+    topside_data: str = s.recv(datalen).decode('ASCII')
+    chunks: list[str] = topside_data.split(",");
     if(chunks[0] != "$CTCTL"):
         print("Invalid NMEA header topside")
         return
@@ -76,7 +76,7 @@ def monitor_socket_input():
 def transmit_topside_socket():
     time.sleep(1)
     while(True):
-        nmea: str = "$RPCTL," + str(data) + ",*FF" # dummy checksum
+        nmea: str = "$RPCTL," + str(onboard_data) + ",*FF" # dummy checksum
         len_str: str = str(len(nmea)).zfill(4)
         transmission = (len_str + nmea).encode('ASCII')
         s.send(transmission)
@@ -90,7 +90,7 @@ def transmit_serial():
 
 def main():
     global nmea_bytes
-    global data
+    global onboard_data
     transmission_thread = threading.Thread(target=transmit_serial)
     transmission_thread.daemon = True
     transmission_thread.start()
@@ -103,7 +103,7 @@ def main():
         nmea_bytes = nmea_encode.encode(gamepad_input_tuple)
         if(ser.in_waiting > 0):
             try:
-                data = ser.readline().decode('ASCII').rstrip()
+                onboard_data = ser.readline().decode('ASCII').rstrip()
                 print(data)
             except UnicodeDecodeError:
                 data = "unicode error"
