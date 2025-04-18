@@ -104,9 +104,9 @@ def main():
         if(ser.in_waiting > 0):
             try:
                 onboard_data = ser.readline().decode('ASCII').rstrip()
-                print(data)
+                print(onboard_data)
             except UnicodeDecodeError:
-                data = "unicode error"
+                onboard_data = "unicode error"
 
 main()
 
