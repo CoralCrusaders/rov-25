@@ -55,8 +55,6 @@ def main():
     monitor_socket_thread = threading.Thread(target=monitor_socket_input)
     monitor_socket_thread.daemon = True
     monitor_socket_thread.start()
-    transmit_gamepad_thread = threading.Thread(target=transmit_gamepad)
-    transmit_gamepad_thread.daemon = True
-    transmit_gamepad_thread.start()
+    transmit_gamepad()
 
 main()

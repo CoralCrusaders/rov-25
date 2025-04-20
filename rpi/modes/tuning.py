@@ -18,7 +18,7 @@ onboard_data: str = ""
 nmea_bytes = b''
 
 # python floats are 64-bit doubles
-pidfs_consts = list[float] = [0.0] * 5 * 4
+pidfs_consts: list[float] = [0.0] * 5 * 4
 pidfs_tuple: tuple[float, ...] = tuple(pidfs_consts)
 
 gamepad_inputs: list[int] = [0] * GAMEPAD_NUM_INPUTS
