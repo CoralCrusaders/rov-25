@@ -21,8 +21,6 @@ conn, addr = s.accept()
 print("connection address:", addr)
 s.setblocking(0)
 
-nmea_bytes: bytes = b''
-
 def monitor_socket_input():
     data: str = ""
     time.sleep(1)
