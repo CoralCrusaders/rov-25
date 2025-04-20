@@ -66,7 +66,7 @@
 class PIDFS {
   #define PIDF_FORWARD 1
   #define PIDF_REVERSE -1 
-  private:
+  public:
     uint32_t passed_time;
     uint32_t cur_time;
     uint32_t prev_time;
@@ -75,13 +75,15 @@ class PIDFS {
     double prev_err;
     double tot_err;
     double drv_err;  
-  public:
+    
     double Kp;
     double Ki;
     double Kd;
     double Kf;
     double Ks;
     double target;
+
+    double last;
 
     PIDFS(double kp, double ki, double kd, double kf, double ks);
     double compute(double input);
@@ -112,12 +114,13 @@ double PIDFS::compute(double input) {
   //Serial.print(tot_err);
   //Serial.print("\n");
 
-  return Kp * cur_err + Ki * tot_err + Kd * drv_err + Kf * target + Ks;
+  last = Kp * cur_err + Ki * tot_err + Kd * drv_err + Kf * target + Ks;
+  return last;
 }
 
 void PIDFS::set_target(double tg) {
     target = tg;
-    prev_time = millis();
+    //prev_time = millis();
     // prev_err = 0;
 }
 
@@ -216,6 +219,8 @@ double yaw_target = 0;
 double pitch_target = 0;
 double roll_target = 0;
 
+uint32_t last_depth_read;
+
 inline void bar02_setup() {
   while(!bar02_sensor.init()) {
     Serial.println("Failed to initialize bar02");
@@ -253,6 +258,9 @@ void setup() {
 
   Wire.begin();
   Wire.setClock(400000); // 400kHz
+  
+  bar02_setup();
+  BNO08x_setup();
 
   thrusters.vfl.attach(VFL);
   thrusters.vfr.attach(VFR);
@@ -285,7 +293,7 @@ inline void quaternionToEulerRV(sh2_RotationVector_t* rotational_vector) {
 } 
 
 inline double shortest_angle(double a, double b) {
-  double diff = fmod(b - a + 180, 360) - 180;
+  double diff = fmod(b - a + 180, 360);
   if (diff < 0) {
     diff += 360;
   }
@@ -353,17 +361,17 @@ inline void read_serial_input() {
 inline void set_consts() {
   if(input_data.BTN_LB) {
     if(slowmode_btn_avl) {
-      if(slowmode) {
-        slowmode = false;
-        mult = DEFAULT_MULT;
-      } else {
-        slowmode = true;
-        mult = SLOW_MULT;
-      }
+      slowmode = !slowmode;
     }
     slowmode_btn_avl = false;  
   } else {
     slowmode_btn_avl = true;
+  }
+  
+  if(slowmode) {
+    mult = SLOW_MULT;
+  } else { 
+    mult = DEFAULT_MULT;
   }
 }
 
@@ -390,8 +398,11 @@ inline void read_imu() {
 
 inline void read_bar02() {
   bar02_sensor.read();
-  sensor_data.depth_m_s = bar02_sensor.depth() - sensor_data.depth_m;
-  sensor_data.depth_m += sensor_data.depth_m_s;
+  double diff = bar02_sensor.depth() - sensor_data.depth_m;
+  sensor_data.depth_m_s = diff / ((millis() - last_depth_read) / 1000.0f);
+  last_depth_read = millis();
+  sensor_data.depth_m += diff;
+  //Serial.println(bar02_sensor.pressure());
 }
 
 inline void calc_vert_power() {
@@ -406,11 +417,11 @@ inline void calc_vert_power() {
   double roll_pwr;
   double desired_roll_rate;
 
-  double depth_pwr = 0;
+  double depth_pwr;
   double desired_depth_rate = 0;
 
   if(abs(input_data.ABS_RY) != 0) {
-    desired_depth_rate = input_data.ABS_RY / JOYSTICK_MAGNITUDE * 1.0f;
+    desired_depth_rate = NORMALIZE_JOYSTICK(input_data.ABS_RY) * 1.0f;
     depth_set_avl = true;
   } else {
     if(depth_set_avl) {
@@ -419,8 +430,10 @@ inline void calc_vert_power() {
     }
     desired_depth_rate = depth_rate_controller.compute(sensor_data.depth_m);
   }
+
   depth_pwr_controller.set_target(desired_depth_rate);
   depth_pwr = depth_pwr_controller.compute(sensor_data.depth_m_s);
+
   vfl_pwr += depth_pwr;
   vfr_pwr += depth_pwr;
   vbl_pwr += depth_pwr;
@@ -463,7 +476,7 @@ inline void calc_hor_power() {
   double yaw_pwr = 0;
   double desired_yaw_rate;
   if(abs(input_data.ABS_LT) != 0 || abs(input_data.ABS_RT) != 0) {
-    desired_yaw_rate = (input_data.ABS_LT - input_data.ABS_RT) / TRIGER_MAGNITUDE * 180.0f; // replace 180 with how many deg / s at max throttle
+    desired_yaw_rate = NORMALIZE_TRIGGER(input_data.ABS_LT - input_data.ABS_RT) * 180.0f; // replace 180 with how many deg / s at max throttle
     yaw_set_avl = true;
   } else {
     if(yaw_set_avl) {
@@ -602,11 +615,11 @@ inline void transmit_rov_data() {
   Serial.print(",");
   Serial.print(depth_pwr_controller.target);
   Serial.print(",");
-  Serial.print(depth_pwr_controller.compute(sensor_data.depth_m_s));
+  Serial.print(depth_pwr_controller.last);
   Serial.print(",");
   Serial.print(yaw_pwr_controller.target);
   Serial.print(",");
-  Serial.print(yaw_pwr_controller.compute(sensor_data.yaw_deg_s));
+  Serial.print(yaw_pwr_controller.last);
   Serial.print(",");
   // throaway checksum
   Serial.println("*FF");
@@ -614,14 +627,17 @@ inline void transmit_rov_data() {
 
 void loop() {
   read_serial_input();
+  elim_deadzones();
   set_consts();
   read_imu();
   read_bar02();
   calc_vert_power();
-  calc_hor_power();
+  calc_hor_power();   
   limit_current();
-  power_thrusters();
-  transmit_rov_data();
-
+  //power_thrusters();
+  if(prog_iter == 0) {
+    transmit_rov_data();
+  }
   prog_iter = (prog_iter + 1) % SERIAL_TRANSMISSION_WRAP;
 }
+ 

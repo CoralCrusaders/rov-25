@@ -1,5 +1,4 @@
 import typing
-import board
 import glob
 import threading
 import serial
@@ -11,7 +10,7 @@ import socket
 HOST = '192.168.68.12'
 PORT = 10110 # standard NMEA port
 
-TEENSY_4_1_PIPE = '/dev/ACM0'
+TEENSY_4_1_PIPE = '/dev/ttyACM0'
 
 GAMEPAD_NUM_INPUTS: int = 18
 
@@ -100,7 +99,7 @@ def main():
     while True:
         monitor_socket_input()
         gamepad_input_tuple = tuple(gamepad_inputs)
-        nmea_bytes = nmea_encode.encode(gamepad_input_tuple)
+        nmea_bytes = nmea_encode.nmea_encode(gamepad_input_tuple)
         if(ser.in_waiting > 0):
             try:
                 onboard_data = ser.readline().decode('ASCII').rstrip()
