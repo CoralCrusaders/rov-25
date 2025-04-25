@@ -68,7 +68,7 @@ void MS5837::setModel(uint8_t model) {
 
 void MS5837::setFluidDensity(float density) {
 	fluidDensity = density;
-	// Recomputer incase fluidDensity changes
+	// Recompute incase fluidDensity changes
 	invGravity = 1.0f / (fluidDensity * 9.80665f);
 }
 
