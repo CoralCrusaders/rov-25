@@ -70,10 +70,6 @@ public:
 	 */
 	void read();
 
-	/** Pressure returned in mbar or mbar*conversion rate.
-	 */
-	float pressure(float conversion = 1.0f);
-
 	/** Temperature returned in deg C.
 	 */
 	float temperature();
@@ -82,10 +78,6 @@ public:
 	 *  liquids only. Uses density that is set for fresh or seawater.
 	 */
 	float depth();
-
-	/** Altitude returned in meters (valid for operation in air only).
-	 */
-	float altitude();
 
 private:
 
@@ -98,6 +90,8 @@ private:
 	int32_t P;
 	uint8_t _model;
 
+	// Precomputed inverse gravity because division is slow
+	float invGravity;
 	float fluidDensity;
 
 	/** Performs calculations per the sensor data sheet for conversion and

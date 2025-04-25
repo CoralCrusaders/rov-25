@@ -1,12 +1,15 @@
 #include "MS5837.h"
 #include <Wire.h>
 
+
 #define MS5837_ADDR               0x76  
 #define MS5837_RESET              0x1E
 #define MS5837_ADC_READ           0x00
 #define MS5837_PROM_READ          0xA0
 #define MS5837_CONVERT_D1_8192    0x4A
 #define MS5837_CONVERT_D2_8192    0x5A
+// These are the new OSR conversions that were added
+// Keep the old ones for backwards compatibility
 #define MS5837_CONVERT_D1_256     0x40
 #define MS5837_CONVERT_D2_256     0x50
 
@@ -16,11 +19,17 @@ const float MS5837::mbar = 1.0f;
 
 const uint8_t MS5837::MS5837_30BA = 0;
 const uint8_t MS5837::MS5837_02BA = 1;
+// Here the definitions for different versions is removed
+// Because we already know the version?
 
+// Updated this from 1029 to 997 because the 1029 is the density of seawater not pool water
 MS5837::MS5837() {
-	fluidDensity = 1029;
+	fluidDensity = 997;
+	invGravity = 1.0f / (fluidDensity * 9.80665f); // Precompute inverse gravity for depth calculation
 }
 
+// So here the changes are removing dynamic i2c port and then carrying thorough
+// the changes from picking the version of the sensor
 bool MS5837::init() {
 	// Reset the MS5837, per datasheet
 	Wire.beginTransmission(MS5837_ADDR);
@@ -55,16 +64,23 @@ void MS5837::setModel(uint8_t model) {
 	_model = model;
 }
 
+// Removed getModel function because it gets the model of the sensor?
+
 void MS5837::setFluidDensity(float density) {
 	fluidDensity = density;
+	// Recomputer incase fluidDensity changes
+	invGravity = 1.0f / (fluidDensity * 9.80665f);
 }
 
 void MS5837::read() {
+	// Removed the check for _i2cPort being NULL
+	
 	// Request D1 conversion
 	Wire.beginTransmission(MS5837_ADDR);
 	Wire.write(MS5837_CONVERT_D1_256);
 	Wire.endTransmission();
 
+	// Using 0.6ms delay for the conversion time instead of 20ms
 	delayMicroseconds(600); // Max conversion time per datasheet
 	
 	Wire.beginTransmission(MS5837_ADDR);
@@ -161,27 +177,19 @@ void MS5837::calculate() {
 	}
 }
 
-float MS5837::pressure(float conversion) {
-    if ( _model == MS5837_02BA ) {
-        return P*conversion/100.0f;
-    }
-    else {
-        return P*conversion/10.0f;
-    }
-}
-
+// Even though we don't call this its nice to keep it in, in case we ever need to call temperature
 float MS5837::temperature() {
 	return TEMP/100.0f;
 }
 
+// Rewrote to have pressure inline to prevent a function call and storage in memory
+// 101300 is a double so changed it to be a float
+// Also used invGravity because division is slow
 float MS5837::depth() {
-	return (pressure(MS5837::Pa)-101300)/(fluidDensity*9.80665);
+	return (P-101300.0f) * invGravity;
 }
 
-float MS5837::altitude() {
-	return (1-pow((pressure()/1013.25),.190284))*145366.45*.3048;
-}
-
+// Remove altitude function because we are in a pool
 
 uint8_t MS5837::crc4(uint16_t n_prom[]) {
 	uint16_t n_rem = 0;
