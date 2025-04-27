@@ -5,6 +5,10 @@ import threading
 import typing
 import ast
 from tkinter import *
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from collections import deque
+import numpy as np
 
 HOST = '192.168.68.12'
 PORT = 10110 # standard NMEA port

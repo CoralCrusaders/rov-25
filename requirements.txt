@@ -2,3 +2,4 @@ PyYAML==6.0.2
 inputs==0.5
 pyserial==3.5
 matplotlib==3.10.1
+numpy==2.2.5
