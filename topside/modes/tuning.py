@@ -21,7 +21,7 @@ conn, addr = s.accept()
 print("connection address:", addr)
 s.setblocking(0)
 
-depth_rate_p: float = 0.7
+depth_rate_p: float = 0.3
 depth_rate_i: float = 0.0
 depth_rate_d: float = 0.0
 depth_rate_f: float = 0.0

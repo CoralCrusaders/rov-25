@@ -82,7 +82,7 @@ def monitor_socket_input():
 def transmit_topside_socket():
     time.sleep(1)
     while(True):
-        nmea: str = "$RPCTL," + str(onboard_data) + ",*FF" # dummy checksum
+        nmea: str = "$RPCTL," + str(onboard_data) # dummy checksum included
         len_str: str = str(len(nmea)).zfill(4)
         transmission = (len_str + nmea).encode('ASCII')
         s.send(transmission)
@@ -112,10 +112,17 @@ def main():
         #nmea_bytes = nmea_encode.nmea_encode(transmission_tuple)
         nmea_bytes = nmea_encode.nmea_encode(gamepad_input_tuple)
         if(ser.in_waiting > 0):
+            old_data = onboard_data
             try:
                 onboard_data = ser.readline().decode('ASCII').rstrip()
-                #print(onboard_data)
+                if onboard_data.startswith("$TNCTL,"):
+                    onboard_data = onboard_data[7:] # Remove the header
+                else:
+                    print("invalid header: " + onboard_data)    
+                    onboard_data = old_data
             except UnicodeDecodeError:
                 onboard_data = "unicode error"
+            except Exception as e:
+                onboard_data = f"error: {str(e)}"
 
 main()
