@@ -39,6 +39,9 @@
 #define DEFAULT_MULT ((double)1.0)
 #define SLOW_MULT ((double)0.5)
 
+#define VOLTAGE A12
+#define CURRENT A13
+
 #define S1 A8
 #define S2 A0
 #define S3 A1
@@ -640,4 +643,3 @@ void loop() {
   }
   prog_iter = (prog_iter + 1) % SERIAL_TRANSMISSION_WRAP;
 }
- 
