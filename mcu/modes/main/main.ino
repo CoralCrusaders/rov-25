@@ -623,6 +623,8 @@ inline void transmit_rov_data() {
   Serial.print(",");
   Serial.print(yaw_pwr_controller.last);
   Serial.print(",");
+  Serial.print(millis());
+  Serial.print(",");
   // throaway checksum
   Serial.println("*FF");
 }

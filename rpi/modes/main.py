@@ -121,7 +121,7 @@ def process_teensy_data():
                     print(f"From Teensy: {data}")
                     
                     # Forward to topside immediately
-                    nmea = f"$RPCTL,{data},*FF"  # Dummy checksum
+                    nmea = data
                     len_str = str(len(nmea)).zfill(4)
                     transmission = (len_str + nmea).encode('ASCII')
                     s.send(transmission)
