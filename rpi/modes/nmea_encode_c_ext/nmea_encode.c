@@ -8,7 +8,7 @@
 #define NMEA_NUM_ARGS 18
 #define NMEA_FOOTER_LEN 3
 #define NMEA_LEN (NMEA_HEADER_LEN + sizeof(gamepad_data_t) + NMEA_FOOTER_LEN)
-#define NMEA_MAX_LEN 256
+#define NMEA_MAX_LEN 512
 
 #ifdef __GNUC__
 #define PACK( __Declaration__ ) __Declaration__ __attribute__((__packed__))
@@ -41,7 +41,50 @@ PACK(struct gamepad_data_t {
     int64_t BTN_SELECT;
 });
 
+PACK(struct tuning_data_t {
+    double depth_rate_p;
+    double depth_rate_i;
+    double depth_rate_d;
+    double depth_rate_f;
+    double depth_rate_s;
+    double depth_pwr_p;
+    double depth_pwr_i;
+    double depth_pwr_d;
+    double depth_pwr_f;
+    double depth_pwr_s;
+    double yaw_rate_p;
+    double yaw_rate_i;
+    double yaw_rate_d;
+    double yaw_rate_f;
+    double yaw_rate_s;
+    double yaw_pwr_p;
+    double yaw_pwr_i;
+    double yaw_pwr_d;
+    double yaw_pwr_f;
+    double yaw_pwr_s;
+    int64_t ABS_LX;
+    int64_t ABS_LY;
+    int64_t ABS_RX;
+    int64_t ABS_RY;
+    int64_t BTN_THUMBL;
+    int64_t BTN_THUMBR;
+    int64_t ABS_HAT0X;
+    int64_t ABS_HAT0Y;
+    int64_t BTN_SOUTH;
+    int64_t BTN_EAST;
+    int64_t BTN_NORTH;
+    int64_t BTN_WEST;
+    int64_t BTN_LB;
+    int64_t BTN_RB;
+    int64_t ABS_LT;
+    int64_t ABS_RT;
+    int64_t BTN_START;
+    int64_t BTN_SELECT;
+});
+
 typedef struct gamepad_data_t gamepad_data_t;
+
+typedef struct tuning_data_t tuning_data_t;
 
 static uint8_t nmea_checksum(const char* nmea, size_t len) {
     uint8_t* nmea_ptr = (uint8_t*)nmea;
@@ -60,6 +103,48 @@ static PyObject* nmea_encode_from_gamepad(PyObject* self, PyObject* args) {
     gamepad_data_t gamepad_data = {0};
     char nmea[NMEA_MAX_LEN];
     if (!PyArg_ParseTuple(args, "(llllllllllllllllll)", 
+    // gamepad data
+    &gamepad_data.ABS_LX, &gamepad_data.ABS_LY, &gamepad_data.ABS_RX, &gamepad_data.ABS_RY, 
+    &gamepad_data.BTN_THUMBL, &gamepad_data.BTN_THUMBR, &gamepad_data.ABS_HAT0X, &gamepad_data.ABS_HAT0Y, 
+    &gamepad_data.BTN_SOUTH, &gamepad_data.BTN_EAST, &gamepad_data.BTN_NORTH, &gamepad_data.BTN_WEST, 
+    &gamepad_data.BTN_LB, &gamepad_data.BTN_RB, &gamepad_data.ABS_LT, &gamepad_data.ABS_RT, 
+    &gamepad_data.BTN_START, &gamepad_data.BTN_SELECT)) {
+        return NULL;
+    }
+    //printf("ABS_LX: %d ", (int32_t)gamepad_data.ABS_LX);
+    //printf("ABS_LY: %d ", (int32_t)gamepad_data.ABS_LY);
+    //printf("ABS_RX: %d ", (int32_t)gamepad_data.ABS_RX);
+    //printf("ABS_RY: %d ", (int32_t)gamepad_data.ABS_RY);
+    //printf("\n");
+    // keep track of the index of the nmea buffer
+    uint32_t nmea_index = 0;
+    // add header to beginning of nmea buffer
+    memcpy(&nmea[nmea_index], NMEA_HEADER, NMEA_HEADER_LEN);
+    nmea_index += NMEA_HEADER_LEN;
+    // copy PACKED (no padding!) gamepad data to nmea buffer
+    // these are raw bytes, not ascii, so recipient can memcpy directly from transmission
+    memcpy(&nmea[nmea_index], &gamepad_data, sizeof(gamepad_data));
+    nmea_index += sizeof(gamepad_data);
+    // add checksum to end of nmea buffer, formatted as 2 hex ascii characters
+    snprintf(&nmea[nmea_index], NMEA_FOOTER_LEN + 1, "*%02X", nmea_checksum(nmea, nmea_index));
+    // 1 extra for null terminator
+    nmea_index += NMEA_FOOTER_LEN + 1;
+    // print nmea buffer for debugging (will not be readable ascii, will term early)
+    PyObject* res_bytes;
+    res_bytes = PyBytes_FromStringAndSize(nmea, nmea_index);
+    return res_bytes;
+}
+
+static PyObject* nmea_encode_tuning(PyObject* self, PyObject* args) {
+    tuning_data_t gamepad_data = {0};
+    char nmea[NMEA_MAX_LEN];
+    if (!PyArg_ParseTuple(args, "(ddddddddddddddddddddllllllllllllllllll)", 
+    // PIDFS values
+    &gamepad_data.depth_rate_p, &gamepad_data.depth_rate_i, &gamepad_data.depth_rate_d, &gamepad_data.depth_rate_f, &gamepad_data.depth_rate_s,
+    &gamepad_data.depth_pwr_p, &gamepad_data.depth_pwr_i, &gamepad_data.depth_pwr_d, &gamepad_data.depth_pwr_f, &gamepad_data.depth_pwr_s,
+    &gamepad_data.yaw_rate_p, &gamepad_data.yaw_rate_i, &gamepad_data.yaw_rate_d, &gamepad_data.yaw_rate_f, &gamepad_data.yaw_rate_s,
+    &gamepad_data.yaw_pwr_p, &gamepad_data.yaw_pwr_i, &gamepad_data.yaw_pwr_d, &gamepad_data.yaw_pwr_f, &gamepad_data.yaw_pwr_s,
+    // gamepad data
     &gamepad_data.ABS_LX, &gamepad_data.ABS_LY, &gamepad_data.ABS_RX, &gamepad_data.ABS_RY, 
     &gamepad_data.BTN_THUMBL, &gamepad_data.BTN_THUMBR, &gamepad_data.ABS_HAT0X, &gamepad_data.ABS_HAT0Y, 
     &gamepad_data.BTN_SOUTH, &gamepad_data.BTN_EAST, &gamepad_data.BTN_NORTH, &gamepad_data.BTN_WEST, 
@@ -94,6 +179,7 @@ static PyObject* nmea_encode_from_gamepad(PyObject* self, PyObject* args) {
 // python method table
 static PyMethodDef nmea_methods[] = {
     {"nmea_encode", nmea_encode_from_gamepad, METH_VARARGS, "Encode gamepad data to NMEA-formatted bytes"},
+    {"nmea_encode_tuning", nmea_encode_tuning, METH_VARARGS, "Encode tuning data to NMEA-formatted bytes"},
     {NULL, NULL, 0, NULL}
 };
 

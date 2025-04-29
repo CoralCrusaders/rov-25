@@ -17,7 +17,7 @@
 #define HOR_AMP_LIMIT (10)
 #define VERT_AMP_LIMIT (AMP_LIMIT - HOR_AMP_LIMIT)
 // (AMPS) taken from blue robotics t200 specs @ 12V
-// https://cad.bluerobotics.com/T200-Public-Performance-Data-10-20V-September-2019.xlsx
+// https://cad.bluerobotics.com/T200-Public -Performance-Data-10-20V-September-2019.xlsx
 #define AMP_LIST {17.03, 17.08, 16.76, 16.52, 16.08, 15.69, 15.31, 15.00, 14.51, 14.17, 13.82, 13.46, 13.08, 12.80, 12.40, 12.00, 11.66, 11.31, 11.10, 10.74, 10.50, 10.11, 9.84, 9.50, 9.20, 8.90, 8.60, 8.30, 8.00, 7.70, 7.40, 7.10, 6.90, 6.60, 6.40, 6.20, 5.99, 5.77, 5.50, 5.32, 5.17, 4.90, 4.70, 4.56, 4.30, 4.10, 3.90, 3.73, 3.60, 3.40, 3.30, 3.10, 2.98, 2.80, 2.70, 2.41, 2.30, 2.10, 2.00, 1.90, 1.80, 1.70, 1.60, 1.50, 1.31, 1.30, 1.20, 1.10, 1.00, 0.90, 0.80, 0.80, 0.70, 0.60, 0.50, 0.50, 0.41, 0.40, 0.40, 0.30, 0.29, 0.20, 0.20, 0.20, 0.10, 0.10, 0.10, 0.05, 0.05, 0.05, 0.05, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.05, 0.05, 0.05, 0.10, 0.10, 0.10, 0.10, 0.20, 0.20, 0.20, 0.30, 0.30, 0.40, 0.40, 0.50, 0.50, 0.60, 0.70, 0.70, 0.80, 0.80, 1.00, 1.00, 1.10, 1.20, 1.30, 1.40, 1.50, 1.60, 1.70, 1.80, 2.00, 2.10, 2.20, 2.30, 2.50, 2.80, 2.90, 3.00, 3.20, 3.30, 3.50, 3.67, 3.80, 4.00, 4.20, 4.40, 4.60, 4.80, 5.00, 5.20, 5.40, 5.69, 5.80, 6.00, 6.30, 6.50, 6.70, 7.00, 7.20, 7.50, 7.80, 8.00, 8.32, 8.64, 8.90, 9.24, 9.50, 9.82, 10.14, 10.45, 10.72, 11.10, 11.32, 11.62, 12.01, 12.37, 12.61, 13.04, 13.44, 13.70, 14.11, 14.40, 14.76, 15.13, 15.52, 15.87, 16.30, 16.74, 16.86, 16.91};
 // divide pwm power by 4 and add 100 to get index
 // ternaries are spaghetti to round to higher current value if not divisible by 4
@@ -25,9 +25,9 @@
 
 #define ESC_MAGNITUDE (400)
 #define JOYSTICK_MAGNITUDE (32767)
-#define TRIGER_MAGNITUDE (255)
+#define TRIGER_MAGNITUDE (1023)
 #define JOYSTICK_DEADZONE_CONST 3000
-#define TRIGGER_DEADZONE_CONST 10
+#define TRIGGER_DEADZONE_CONST 40
 #define NORMALIZE_JOYSTICK(x) ((double)((double)x / (double)(JOYSTICK_MAGNITUDE)))
 #define NORMALIZE_TRIGGER(x) ((double)((double)x / (double)(TRIGER_MAGNITUDE)))
 #define THRUSTER_POWER(x) (int32_t)(1500 + x)
@@ -633,20 +633,53 @@ inline void transmit_rov_data() {
   Serial.print(",");
   Serial.print(sensor_data.roll_deg_s);
   Serial.print(",");
+  Serial.print(depth_rate_controller.target);
+  Serial.print(",");
+  Serial.print(depth_rate_controller.last);
+  Serial.print(",");
   Serial.print(depth_pwr_controller.target);
   Serial.print(",");
   Serial.print(depth_pwr_controller.last);
+  Serial.print(",");
+  Serial.print(yaw_rate_controller.target);
+  Serial.print(",");
+  Serial.print(yaw_rate_controller.last);
   Serial.print(",");
   Serial.print(yaw_pwr_controller.target);
   Serial.print(",");
   Serial.print(yaw_pwr_controller.last);
   Serial.print(",");
+  Serial.print(millis());
+  Serial.print(",");
   // throaway checksum
   Serial.println("*FF");
 }
 
+void set_pidfs_consts() {
+  depth_rate_controller.Kp = input_data.depth_rate_p;
+  depth_rate_controller.Ki = input_data.depth_rate_i;
+  depth_rate_controller.Kd = input_data.depth_rate_d;
+  depth_rate_controller.Kf = input_data.depth_rate_f;
+  depth_rate_controller.Ks = input_data.depth_rate_s;
+  depth_pwr_controller.Kp = input_data.depth_pwr_p;
+  depth_pwr_controller.Ki = input_data.depth_pwr_i;
+  depth_pwr_controller.Kd = input_data.depth_pwr_d;
+  depth_pwr_controller.Kf = input_data.depth_pwr_f;
+  depth_pwr_controller.Ks = input_data.depth_pwr_s;
+  yaw_rate_controller.Kp = input_data.yaw_rate_p;
+  yaw_rate_controller.Ki = input_data.yaw_rate_i;
+  yaw_rate_controller.Kd = input_data.yaw_rate_d;
+  yaw_rate_controller.Kf = input_data.yaw_rate_f;
+  yaw_rate_controller.Ks = input_data.yaw_rate_s;
+  yaw_pwr_controller.Kp = input_data.yaw_pwr_p;
+  yaw_pwr_controller.Ki = input_data.yaw_pwr_i;
+  yaw_pwr_controller.Kd = input_data.yaw_pwr_d;
+  yaw_pwr_controller.Kf = input_data.yaw_pwr_f;
+  yaw_pwr_controller.Ks = input_data.yaw_pwr_s;
+} 
 void loop() {
   read_serial_input();
+  set_pidfs_consts();
   elim_deadzones();
   set_consts();
   read_imu();
@@ -660,4 +693,3 @@ void loop() {
   }
   prog_iter = (prog_iter + 1) % SERIAL_TRANSMISSION_WRAP;
 }
- 

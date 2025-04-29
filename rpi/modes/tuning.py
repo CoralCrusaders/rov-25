@@ -10,7 +10,7 @@ import socket
 HOST = '192.168.68.12'
 PORT = 10110 # standard NMEA port
 
-TEENSY_4_1_PIPE = '/dev/ttyACM0'
+TEENSY_4_1_PIPE = '/dev/serial0'
 
 GAMEPAD_NUM_INPUTS: int = 18
 
@@ -65,15 +65,19 @@ def monitor_socket_input():
     try:
         datalen: int = int(s.recv(4).decode('ASCII'))
     except:
-        return         
+        return
     topside_data: str = s.recv(datalen).decode('ASCII')
+    time.sleep(0.01)
     chunks: list[str] = topside_data.split(",");
     if(chunks[0] != "$CTCTL"):
         print("Invalid NMEA header topside")
         return
     # the first 5 * 4 values are the pidfs constants
     pidfs_strs: list[str] = chunks[1:21]
-    pidfs_consts = [float(x) for x in pidfs_strs]
+    try:
+        pidfs_consts = [float(x) for x in pidfs_strs]
+    except ValueError:
+        print(topside_data)
     for event in chunks[21:]:
         code, state = event.split(":")
         gamepad_inputs[gamepad_map[code]] = int(state)
@@ -82,7 +86,7 @@ def monitor_socket_input():
 def transmit_topside_socket():
     time.sleep(1)
     while(True):
-        nmea: str = "$RPCTL," + str(onboard_data) + ",*FF" # dummy checksum
+        nmea: str = "$RPCTL," + str(onboard_data) # dummy checksum included
         len_str: str = str(len(nmea)).zfill(4)
         transmission = (len_str + nmea).encode('ASCII')
         s.send(transmission)
@@ -92,6 +96,7 @@ def transmit_serial():
     time.sleep(1)
     while(True):
         ser.write(nmea_bytes)
+        #print(nmea_bytes)
         time.sleep(0.1)
 
 def main():
@@ -108,14 +113,23 @@ def main():
         pidfs_tuple = tuple(pidfs_consts)
         gamepad_input_tuple = tuple(gamepad_inputs)
         transmission_tuple = pidfs_tuple + gamepad_input_tuple
-        print(transmission_tuple)
-        #nmea_bytes = nmea_encode.nmea_encode(transmission_tuple)
-        nmea_bytes = nmea_encode.nmea_encode(gamepad_input_tuple)
+        #print(transmission_tuple)
+        nmea_bytes = nmea_encode.nmea_encode_tuning(transmission_tuple)
+        #nmea_bytes = nmea_encode.nmea_encode(gamepad_input_tuple)
         if(ser.in_waiting > 0):
+            print("a")
+            old_data = onboard_data
             try:
                 onboard_data = ser.readline().decode('ASCII').rstrip()
-                #print(onboard_data)
+                print(onboard_data)
+                if onboard_data.startswith("$TNCTL,"):
+                    onboard_data = onboard_data[7:] # Remove the header
+                else:
+                    print("invalid header: " + onboard_data)    
+                    onboard_data = old_data
             except UnicodeDecodeError:
                 onboard_data = "unicode error"
+            except Exception as e:
+                onboard_data = f"error: {str(e)}"
 
 main()

@@ -84,6 +84,7 @@ def transmit_topside_socket():
 def transmit_serial():
     time.sleep(1)
     while(True):
+        #print(nmea_bytes)
         ser.write(nmea_bytes)
         time.sleep(0.1)
 
