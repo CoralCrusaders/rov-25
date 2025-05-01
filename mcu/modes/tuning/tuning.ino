@@ -24,7 +24,7 @@
 #define PWR_TO_AMPS(x) (pwr_to_current[(x % 4 == 0) ? (x/4 + 100) : ((x < 0) ? (x/4 + 100 - 1) : (x/4 + 100 + 1))])
 
 #define ESC_MAGNITUDE (400)
-#define JOYSTICK_MAGNITUDE (32767)
+#define JOYSTICK_MAGNITUDE (32768)
 #define TRIGER_MAGNITUDE (1023)
 #define JOYSTICK_DEADZONE_CONST 3000
 #define TRIGGER_DEADZONE_CONST 40
@@ -635,19 +635,11 @@ inline void transmit_rov_data() {
   Serial.print(",");
   Serial.print(depth_rate_controller.target);
   Serial.print(",");
-  Serial.print(depth_rate_controller.last);
-  Serial.print(",");
   Serial.print(depth_pwr_controller.target);
   Serial.print(",");
-  Serial.print(depth_pwr_controller.last);
-  Serial.print(",");
-  Serial.print(yaw_rate_controller.target);
-  Serial.print(",");
-  Serial.print(yaw_rate_controller.last);
+  Serial.print(yaw_target);
   Serial.print(",");
   Serial.print(yaw_pwr_controller.target);
-  Serial.print(",");
-  Serial.print(yaw_pwr_controller.last);
   Serial.print(",");
   Serial.print(millis());
   Serial.print(",");

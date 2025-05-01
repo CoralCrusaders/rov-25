@@ -25,9 +25,9 @@
 
 #define ESC_MAGNITUDE (400)
 #define JOYSTICK_MAGNITUDE (32768)
-#define TRIGER_MAGNITUDE (255)
+#define TRIGER_MAGNITUDE (1023)
 #define JOYSTICK_DEADZONE_CONST 3000
-#define TRIGGER_DEADZONE_CONST 10
+#define TRIGGER_DEADZONE_CONST 40
 #define NORMALIZE_JOYSTICK(x) ((double)((double)x / (double)(JOYSTICK_MAGNITUDE)))
 #define NORMALIZE_TRIGGER(x) ((double)((double)x / (double)(TRIGER_MAGNITUDE)))
 #define THRUSTER_POWER(x) (int32_t)(1500 + x)
@@ -614,14 +614,6 @@ inline void transmit_rov_data() {
   Serial.print(sensor_data.pitch_deg_s);
   Serial.print(",");
   Serial.print(sensor_data.roll_deg_s);
-  Serial.print(",");
-  Serial.print(depth_pwr_controller.target);
-  Serial.print(",");
-  Serial.print(depth_pwr_controller.last);
-  Serial.print(",");
-  Serial.print(yaw_pwr_controller.target);
-  Serial.print(",");
-  Serial.print(yaw_pwr_controller.last);
   Serial.print(",");
   Serial.print(millis());
   Serial.print(",");
