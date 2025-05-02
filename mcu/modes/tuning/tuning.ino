@@ -11,7 +11,7 @@
 #include "MS5837.h"
 
 #define INC_PROG_ITER(i) i++
-#define SERIAL_TRANSMISSION_WRAP (50)
+#define SERIAL_TRANSMISSION_WRAP (1)
 
 #define AMP_LIMIT (20) // fuse melts at 25 amps, leave 5 amp clearance
 #define HOR_AMP_LIMIT (10)
@@ -401,9 +401,9 @@ inline void read_imu() {
   while(!angular_velocity_read || !orientation_read) {
     if(imu.getSensorEvent(&sensor_value)) {
       if(sensor_value.sensorId == SH2_GYROSCOPE_CALIBRATED) {
-        sensor_data.yaw_deg_s = sensor_value.un.gyroscope.x * RAD_TO_DEG;
-        sensor_data.pitch_deg_s = sensor_value.un.gyroscope.y * RAD_TO_DEG;
-        sensor_data.roll_deg_s = sensor_value.un.gyroscope.z * RAD_TO_DEG;
+        sensor_data.yaw_deg_s = sensor_value.un.gyroscope.z * RAD_TO_DEG;
+        sensor_data.pitch_deg_s = sensor_value.un.gyroscope.x * RAD_TO_DEG;
+        sensor_data.roll_deg_s = sensor_value.un.gyroscope.y * RAD_TO_DEG;
         angular_velocity_read = true;
       } else if(sensor_value.sensorId == SH2_GAME_ROTATION_VECTOR) {
         quaternionToEulerRV(&sensor_value.un.gameRotationVector);
@@ -441,7 +441,7 @@ inline void calc_vert_power() {
   double desired_depth_rate = 0;
 
   if(abs(input_data.ABS_RY) != 0) {
-    desired_depth_rate = NORMALIZE_JOYSTICK(input_data.ABS_RY) * 1.0f;
+    desired_depth_rate = NORMALIZE_JOYSTICK(input_data.ABS_RY) * 0.5f;
     depth_set_avl = true;
   } else {
     if(depth_set_avl) {
@@ -496,7 +496,7 @@ inline void calc_hor_power() {
   double yaw_pwr = 0;
   double desired_yaw_rate;
   if(abs(input_data.ABS_LT) != 0 || abs(input_data.ABS_RT) != 0) {
-    desired_yaw_rate = NORMALIZE_TRIGGER(input_data.ABS_LT - input_data.ABS_RT) * 180.0f; // replace 180 with how many deg / s at max throttle
+    desired_yaw_rate = NORMALIZE_TRIGGER(input_data.ABS_LT - input_data.ABS_RT) * 90.0f; // replace 180 with how many deg / s at max throttle
     yaw_set_avl = true;
   } else {
     if(yaw_set_avl) {

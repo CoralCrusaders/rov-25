@@ -99,7 +99,7 @@ static uint8_t nmea_checksum(const char* nmea, size_t len) {
 // python method to encode gamepad data to NMEA-formatted bytes
 // takes in 18 python ints in the order of the gamepad_data struct
 // returns a RAW (not ascii) byte buffer ready to be transmitted
-static PyObject* nmea_encode_from_gamepad(PyObject* self, PyObject* args) {
+static PyObject* nmea_encode_main(PyObject* self, PyObject* args) {
     gamepad_data_t gamepad_data = {0};
     char nmea[NMEA_MAX_LEN];
     if (!PyArg_ParseTuple(args, "(llllllllllllllllll)", 
@@ -178,7 +178,7 @@ static PyObject* nmea_encode_tuning(PyObject* self, PyObject* args) {
 
 // python method table
 static PyMethodDef nmea_methods[] = {
-    {"nmea_encode", nmea_encode_from_gamepad, METH_VARARGS, "Encode gamepad data to NMEA-formatted bytes"},
+    {"nmea_encode_main", nmea_encode_main, METH_VARARGS, "Encode gamepad data to NMEA-formatted bytes"},
     {"nmea_encode_tuning", nmea_encode_tuning, METH_VARARGS, "Encode tuning data to NMEA-formatted bytes"},
     {NULL, NULL, 0, NULL}
 };

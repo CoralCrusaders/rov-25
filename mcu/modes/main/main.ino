@@ -383,9 +383,9 @@ inline void read_imu() {
   while(!angular_velocity_read || !orientation_read) {
     if(imu.getSensorEvent(&sensor_value)) {
       if(sensor_value.sensorId == SH2_GYROSCOPE_CALIBRATED) {
-        sensor_data.yaw_deg_s = sensor_value.un.gyroscope.x * RAD_TO_DEG;
-        sensor_data.pitch_deg_s = sensor_value.un.gyroscope.y * RAD_TO_DEG;
-        sensor_data.roll_deg_s = sensor_value.un.gyroscope.z * RAD_TO_DEG;
+        sensor_data.yaw_deg_s = sensor_value.un.gyroscope.z * RAD_TO_DEG;
+        sensor_data.pitch_deg_s = sensor_value.un.gyroscope.x * RAD_TO_DEG;
+        sensor_data.roll_deg_s = sensor_value.un.gyroscope.y * RAD_TO_DEG;
         angular_velocity_read = true;
       } else if(sensor_value.sensorId == SH2_GAME_ROTATION_VECTOR) {
         quaternionToEulerRV(&sensor_value.un.gameRotationVector);
@@ -423,7 +423,7 @@ inline void calc_vert_power() {
   double desired_depth_rate = 0;
 
   if(abs(input_data.ABS_RY) != 0) {
-    desired_depth_rate = NORMALIZE_JOYSTICK(input_data.ABS_RY) * 1.0f;
+    desired_depth_rate = NORMALIZE_JOYSTICK(input_data.ABS_RY) * 0.5f;
     depth_set_avl = true;
   } else {
     if(depth_set_avl) {

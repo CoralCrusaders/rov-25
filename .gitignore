@@ -1,2 +1,3 @@
 onboard/rpi/bin/*
 .venv/*
+*.so

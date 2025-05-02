@@ -94,7 +94,7 @@ def process_topside_data():
         
         # Convert to tuple and encode NMEA for Teensy
         gamepad_input_tuple = tuple(gamepad_inputs)
-        nmea_bytes = nmea_encode.nmea_encode(gamepad_input_tuple)
+        nmea_bytes = nmea_encode.nmea_encode_main(gamepad_input_tuple)
         
         # Send to Teensy immediately
         if nmea_bytes:

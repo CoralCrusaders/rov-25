@@ -3,10 +3,13 @@ from inputs import get_gamepad
 import time
 import threading
 import typing
+import matplotlib
+import matplotlib.style
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-import numpy as np
+matplotlib.use('TkAgg')  # Set backend before importing pyplot
+matplotlib.style.use('fast')
 from collections import deque
+import numpy as np
 
 HOST = '192.168.68.12'
 PORT = 10110  # standard NMEA port
@@ -88,8 +91,15 @@ yaw_target = deque(maxlen=HISTORY_LENGTH)
 yaw_rate_actual = deque(maxlen=HISTORY_LENGTH)
 yaw_rate_target = deque(maxlen=HISTORY_LENGTH)
 
-# Plotting setup - interactive mode
-plt.ion()
+# Setup display window time
+DISPLAY_WINDOW = 10  # seconds
+
+# Lock for data access
+plot_data_lock = threading.Lock()
+new_data_event = threading.Event()  # Used to signal when new data arrives
+
+# Setup plotting objects in main thread
+plt.ion()  # Turn on interactive mode
 fig, axs = plt.subplots(2, 2, figsize=(14, 8))
 fig.canvas.manager.set_window_title('ROV PID Control Visualization')
 fig.tight_layout(pad=3.0)
@@ -114,14 +124,20 @@ axs[1,1].set_ylabel('Yaw Rate (deg/s)')
 
 for ax in axs.flatten():
     ax.set_xlabel('Time (s)')
+    ax.set_xlim(0, 10)  # Start with a 10-second window
+    ax.set_ylim(-1, 1)  # Default y limits
 
-# Setup time display window - show last X seconds of data
-DISPLAY_WINDOW = 10  # seconds
+# Make sure the window appears
+plt.show(block=False)
+plt.pause(0.1)  # This is essential to make the window show
+
+# Flag to control whether we're still running
+running = True
 
 def monitor_gamepad():
     """Thread to continuously monitor gamepad events and update state array"""
     print("Gamepad monitoring started")
-    while True:
+    while running:
         try:
             events = get_gamepad()
             with gamepad_lock:
@@ -137,131 +153,158 @@ def monitor_socket_input():
     print("Socket monitoring started")
     initial_timestamp = None
     
-    while True:
+    while running:
         try:
             # Get message length (first 4 bytes)
-            datalen = int(conn.recv(4).decode('ASCII'))
+            datalen_bytes = conn.recv(4)
+            if not datalen_bytes:
+                print("Connection closed")
+                break
+                
+            datalen = int(datalen_bytes.decode('ASCII'))
             # Read the actual message
             data = conn.recv(datalen).decode('ASCII')
             
+            # Check if this is our own message echoed back
+            if data.startswith("$CTCTL"):
+                # This is our own message coming back, print but don't process
+                print(f"From RPi: {data}")
+                continue
+                
             # Parse sensor data for visualization if needed
             if data.startswith("$TNCTL,"):
                 values = data.split(",")  # Header, values, and checksum
-                
-                # Ignore if we don't have enough values or if the format is wrong
-                if len(values) < 24:  # Need at least up through the millis value
-                    continue
-                
                 try:
                     # Extract data from message based on the Teensy's transmit_rov_data format
                     # From the Teensy code, we know where each variable is located
-                    curr_depth = float(values[9])           # sensor_data.depth_m
-                    curr_depth_rate = float(values[10])     # sensor_data.depth_m_s
-                    curr_yaw = float(values[11])            # sensor_data.yaw_deg
-                    curr_yaw_rate = float(values[14])       # sensor_data.yaw_deg_s
+                    with plot_data_lock:
+                        curr_depth = float(values[9])          # sensor_data.depth_m
+                        curr_depth_rate = float(values[10])     # sensor_data.depth_m_s
+                        curr_yaw = float(values[11])            # sensor_data.yaw_deg
+                        curr_yaw_rate = float(values[14])       # sensor_data.yaw_deg_s
+                        
+                        # PID targets (from indices seen in transmit_rov_data)
+                        curr_depth_target = float(values[17])   # depth_rate_controller.target
+                        curr_depth_rate_target = float(values[18]) # depth_pwr_controller.target 
+                        curr_yaw_target = float(values[19])      # yaw_target
+                        curr_yaw_rate_target = float(values[20]) # yaw_pwr_controller.target
+                        
+                        # Get millis and convert to seconds
+                        millis = int(values[21])
+                        if initial_timestamp is None:
+                            initial_timestamp = millis
+                        
+                        time_sec = (millis - initial_timestamp) / 1000.0
+                        
+                        # Store data for plotting
+                        timestamps.append(time_sec)
+                        depth_actual.append(curr_depth)
+                        depth_target.append(curr_depth_target)
+                        depth_rate_actual.append(curr_depth_rate)
+                        depth_rate_target.append(curr_depth_rate_target)
+                        yaw_actual.append(curr_yaw)
+                        yaw_target.append(curr_yaw_target)
+                        yaw_rate_actual.append(curr_yaw_rate)
+                        yaw_rate_target.append(curr_yaw_rate_target)
                     
-                    # PID targets (from indices seen in transmit_rov_data)
-                    curr_depth_target = float(values[17])   # depth_rate_controller.target
-                    curr_depth_rate_target = float(values[18]) # depth_pwr_controller.target 
-                    curr_yaw_target = float(values[19])      # yaw_target
-                    curr_yaw_rate_target = float(values[20]) # yaw_pwr_controller.target
-                    
-                    # Get millis and convert to seconds
-                    millis = int(values[21])
-                    if initial_timestamp is None:
-                        initial_timestamp = millis
-                    
-                    time_sec = (millis - initial_timestamp) / 1000.0
-                    
-                    # Store data for plotting
-                    timestamps.append(time_sec)
-                    depth_actual.append(curr_depth)
-                    depth_target.append(curr_depth_target)
-                    depth_rate_actual.append(curr_depth_rate)
-                    depth_rate_target.append(curr_depth_rate_target)
-                    yaw_actual.append(curr_yaw)
-                    yaw_target.append(curr_yaw_target)
-                    yaw_rate_actual.append(curr_yaw_rate)
-                    yaw_rate_target.append(curr_yaw_rate_target)
-                    
-                    # Update the plots
-                    update_plots()
+                    # Signal that we have new data
+                    new_data_event.set()
                     
                 except (ValueError, IndexError) as e:
                     print(f"Error parsing data: {e}")
+            else:
+                print(f"From RPi: {data}")
                     
         except Exception as e:
             # Skip if no data or error
+            print(f"Socket error: {e}")
             time.sleep(0.01)
 
-def update_plots():
-    """Update all plot lines with current data"""
-    if not timestamps:
-        return
+def update_plots_thread():
+    """Thread to periodically update the plots"""
+    print("Plot update thread started")
     
-    # Convert deques to lists for plotting
-    times = list(timestamps)
-    
-    # Calculate time window limits
-    current_time = times[-1]
-    start_time = max(0, current_time - DISPLAY_WINDOW)
-    
-    # Update data for all plots
-    # Depth plot
-    for line, data in zip(depth_lines, [depth_actual, depth_target]):
-        line.set_data(times, list(data))
-    
-    # Depth rate plot
-    for line, data in zip(depth_rate_lines, [depth_rate_actual, depth_rate_target]):
-        line.set_data(times, list(data))
-    
-    # Yaw plot
-    for line, data in zip(yaw_lines, [yaw_actual, yaw_target]):
-        line.set_data(times, list(data))
-    
-    # Yaw rate plot
-    for line, data in zip(yaw_rate_lines, [yaw_rate_actual, yaw_rate_target]):
-        line.set_data(times, list(data))
-    
-    # Set x limits to show moving window
-    for ax in axs.flatten():
-        ax.set_xlim(start_time, current_time)
+    while running:
+        # Wait for new data or timeout
+        new_data_event.wait(timeout=0.1)
+        new_data_event.clear()
         
-    # Auto-scale y limits for all plots
-    if depth_actual and depth_target:
-        min_val = min(min(depth_actual), min(depth_target))
-        max_val = max(max(depth_actual), max(depth_target))
-        padding = (max_val - min_val) * 0.1 or 0.1  # Add 10% padding, with fallback
-        axs[0,0].set_ylim(min_val - padding, max_val + padding)
-        
-    if depth_rate_actual and depth_rate_target:
-        min_val = min(min(depth_rate_actual), min(depth_rate_target))
-        max_val = max(max(depth_rate_actual), max(depth_rate_target))
-        padding = (max_val - min_val) * 0.1 or 0.1
-        axs[0,1].set_ylim(min_val - padding, max_val + padding)
-        
-    if yaw_actual and yaw_target:
-        min_val = min(min(yaw_actual), min(yaw_target))
-        max_val = max(max(yaw_actual), max(yaw_target))
-        padding = (max_val - min_val) * 0.1 or 0.1
-        axs[1,0].set_ylim(min_val - padding, max_val + padding)
-        
-    if yaw_rate_actual and yaw_rate_target:
-        min_val = min(min(yaw_rate_actual), min(yaw_rate_target))
-        max_val = max(max(yaw_rate_actual), max(yaw_rate_target))
-        padding = (max_val - min_val) * 0.1 or 0.1
-        axs[1,1].set_ylim(min_val - padding, max_val + padding)
-    
-    # Redraw the figure
-    fig.canvas.draw_idle()
-    fig.canvas.flush_events()
+        try:
+            with plot_data_lock:
+                if not timestamps:
+                    plt.pause(0.1)  # Give the GUI time to update
+                    continue
+                
+                # Convert deques to lists for plotting
+                times = list(timestamps)
+                
+                # Calculate time window limits
+                current_time = times[-1]
+                start_time = max(0, current_time - DISPLAY_WINDOW)
+                
+                # Update data for all plots
+                # Depth plot
+                for line, data in zip(depth_lines, [depth_actual, depth_target]):
+                    line.set_data(times, list(data))
+                
+                # Depth rate plot
+                for line, data in zip(depth_rate_lines, [depth_rate_actual, depth_rate_target]):
+                    line.set_data(times, list(data))
+                
+                # Yaw plot
+                for line, data in zip(yaw_lines, [yaw_actual, yaw_target]):
+                    line.set_data(times, list(data))
+                
+                # Yaw rate plot
+                for line, data in zip(yaw_rate_lines, [yaw_rate_actual, yaw_rate_target]):
+                    line.set_data(times, list(data))
+                
+                # Set x limits to show moving window
+                for ax in axs.flatten():
+                    ax.set_xlim(start_time, current_time)
+                
+                # Auto-scale y limits for all plots
+                try:
+                    if depth_actual and depth_target:
+                        min_val = min(min(depth_actual), min(depth_target))
+                        max_val = max(max(depth_actual), max(depth_target))
+                        padding = max((max_val - min_val) * 0.1, 0.1)  # 10% padding or at least 0.1
+                        axs[0,0].set_ylim(min_val - padding, max_val + padding)
+                    
+                    if depth_rate_actual and depth_rate_target:
+                        min_val = min(min(depth_rate_actual), min(depth_rate_target))
+                        max_val = max(max(depth_rate_actual), max(depth_rate_target))
+                        padding = max((max_val - min_val) * 0.1, 0.1)
+                        axs[0,1].set_ylim(min_val - padding, max_val + padding)
+                    
+                    if yaw_actual and yaw_target:
+                        min_val = min(min(yaw_actual), min(yaw_target))
+                        max_val = max(max(yaw_actual), max(yaw_target))
+                        padding = max((max_val - min_val) * 0.1, 0.1)
+                        axs[1,0].set_ylim(min_val - padding, max_val + padding)
+                    
+                    if yaw_rate_actual and yaw_rate_target:
+                        min_val = min(min(yaw_rate_actual), min(yaw_rate_target))
+                        max_val = max(max(yaw_rate_actual), max(yaw_rate_target))
+                        padding = max((max_val - min_val) * 0.1, 0.1)
+                        axs[1,1].set_ylim(min_val - padding, max_val + padding)
+                except (ValueError, TypeError) as e:
+                    print(f"Error updating plot limits: {e}")
+            
+            # Redraw the figure
+            fig.canvas.draw_idle()
+            plt.pause(0.01)  # This is crucial! Gives matplotlib time to update the window
+            
+        except Exception as e:
+            print(f"Error updating plots: {e}")
+            plt.pause(0.1)  # Still need to update GUI
 
 def transmit_gamepad():
     """Thread to periodically send gamepad state to RPi"""
     print("Transmission thread started")
     time.sleep(1)  # Initial delay to ensure connection is ready
     
-    while True:
+    while running:
         try:
             # Build NMEA string with PIDFS parameters and current gamepad state
             nmea = NMEA_HEADER
@@ -289,6 +332,7 @@ def transmit_gamepad():
         time.sleep(TRANSMIT_RATE)
 
 def main():
+    global running
     try:
         # Start gamepad monitoring thread
         gamepad_thread = threading.Thread(target=monitor_gamepad, daemon=True)
@@ -299,15 +343,19 @@ def main():
         receive_thread.start()
         
         # Run transmission function in main thread
-        transmit_gamepad()
+        transmit_thread = threading.Thread(target=transmit_gamepad, daemon=True)
+        transmit_thread.start()
+
+        update_plots_thread()
         
     except KeyboardInterrupt:
         print("Program terminated by user")
     except Exception as e:
         print(f"Error in main: {e}")
     finally:
+        running = False
         try:
-            plt.close()
+            plt.close('all')
             conn.close()
             s.close()
         except:
